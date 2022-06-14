@@ -17,8 +17,10 @@
         python compile_data.py
 
 Исходные данные можно найти на сайте Росстат https://rosstat.gov.ru поиском 
-формы "ЕСТЕСТВЕННОЕ ДВИЖЕНИЕ НАСЕЛЕНИЯ" или по прямой ссылке 
-(данные на октябрь 2021 доступны тут: https://rosstat.gov.ru/storage/mediabank/2021_edn10.htm)
+формы "ЕСТЕСТВЕННОЕ ДВИЖЕНИЕ НАСЕЛЕНИЯ" или по прямой ссылке. 
+
+Данные на октябрь 2021 и ранее: https://rosstat.gov.ru/storage/mediabank/2021_edn10.htm
+Данные на февраль 2022 и ранее: https://rosstat.gov.ru/storage/mediabank/Edn_02-2022(1).htm
 
 Исходные данные используются as is, без модификаций или изменений. Автор не несет какой-либо ответственности 
 за интерпретацию исходных данных или обработанных результатов.
@@ -31,9 +33,9 @@ import re
 import json
 
 from pathlib import Path
-from functools import reduce, cache
+from functools import reduce, lru_cache
 
-@cache
+@lru_cache
 def get_reg_map():
     with open('reg_map.json', 'rt', encoding='utf-8') as fp:
         js_data = json.load(fp)
@@ -108,7 +110,7 @@ def process_file(file_name):
     df = df_data.iloc[n_start:n_end, cols]
     df.columns = ['subject', 'total_deaths', 'confirmed_covid_deaths', 'possible_covid_deaths']
     df['name_key'] = df['subject'].str.replace(' ','').str.upper()
-    df['period'] = f'{period[1]:04d}-{period[0]:02d}-01'
+    df['period'] = pd.Timestamp(year=period[1], month=period[0], day=1)
 
     # Нумифицируем колонки
     df['total_deaths'] = df['total_deaths'].astype('float')
@@ -139,6 +141,9 @@ def process_file(file_name):
 def main():
     # Собираем данные в виде списка
     data_list = [process_file(str(f)) for f in Path('data').glob('*.xlsx')]
+    if not data_list:
+        print('ERROR: Отсутствуют исходные файлы, нужно загрузить их из источника')
+        exit(1)
 
     # Исключаем None
     data_list_filtered = filter(lambda x: x is not None, data_list)
